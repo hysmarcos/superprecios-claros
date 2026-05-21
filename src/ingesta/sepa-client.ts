@@ -36,17 +36,32 @@ export async function downloadDailySepaZip(now: Date = new Date()): Promise<Sepa
   const dest = join(env.INGESTA_TMP_DIR, filename);
 
   logger.info({ url, dest }, 'downloading SEPA ZIP');
-  // El backend de datos.produccion.gob.ar está detrás de CloudFront y filtra
-  // requests sin User-Agent de browser (Node sin headers da 403 desde IPs no-AR).
-  // Mandamos UA realista + Accept para pasar.
+  // datos.produccion.gob.ar está detrás de CloudFront. WAF/Bot Control puede
+  // rechazar requests con headers minimalistas (Node fetch sin browser headers
+  // → 403 desde Railway). Set completo de headers de Chrome reciente.
   const res = await fetch(url, {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-      'Accept': 'application/zip, application/octet-stream, */*',
-      'Accept-Language': 'es-AR,es;q=0.9,en;q=0.8',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+      'Accept-Language': 'es-AR,es;q=0.9,en-US;q=0.8,en;q=0.7',
+      'Accept-Encoding': 'identity',
+      'Sec-Ch-Ua': '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"',
+      'Sec-Ch-Ua-Mobile': '?0',
+      'Sec-Ch-Ua-Platform': '"Windows"',
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'none',
+      'Sec-Fetch-User': '?1',
+      'Upgrade-Insecure-Requests': '1',
     },
   });
-  if (!res.ok) throw new Error(`SEPA download failed: ${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    // Capturar primeros bytes de body para diagnosticar (CloudFront muestra error en HTML)
+    let bodySnippet = '';
+    try { bodySnippet = (await res.text()).slice(0, 500); } catch {}
+    logger.error({ status: res.status, statusText: res.statusText, bodySnippet, responseHeaders: Object.fromEntries(res.headers) }, 'SEPA fetch error response');
+    throw new Error(`SEPA download failed: ${res.status} ${res.statusText}`);
+  }
   if (!res.body) throw new Error('SEPA response has no body');
 
   await pipeline(res.body as unknown as NodeJS.ReadableStream, createWriteStream(dest));
