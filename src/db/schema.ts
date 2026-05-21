@@ -9,7 +9,7 @@ export const productos = pgTable('productos', {
   nombre: text('nombre').notNull(),
   marca: text('marca'),
   cantidadPresentacion: numeric('cantidad_presentacion', { precision: 10, scale: 3 }),
-  unidadMedida: varchar('unidad_medida', { length: 10 }),
+  unidadMedida: varchar('unidad_medida', { length: 20 }),
   firstSeen: date('first_seen').notNull(),
   lastSeen: date('last_seen').notNull(),
 }, (t) => ({
