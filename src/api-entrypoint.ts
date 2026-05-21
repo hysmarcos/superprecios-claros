@@ -4,6 +4,7 @@ import { registerHealth } from './api/routes/health.js';
 import { registerManifest } from './api/routes/manifest.js';
 import { registerSku } from './api/routes/sku.js';
 import { registerSkus } from './api/routes/skus.js';
+import { registerBasket } from './api/routes/basket.js';
 import { env } from './lib/env.js';
 import { logger } from './lib/logger.js';
 
@@ -12,6 +13,7 @@ registerHealth(app);
 registerManifest(app);
 registerSku(app);
 registerSkus(app);
+registerBasket(app);
 
 serve({ fetch: app.fetch, port: env.PORT }, ({ port }) => {
   logger.info({ port }, 'API listening');
