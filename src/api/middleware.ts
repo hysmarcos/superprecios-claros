@@ -31,6 +31,16 @@ export const errorHandler: MiddlewareHandler = async (c, next) => {
   }
 };
 
+export const onErrorHandler = (e: Error, c: Parameters<MiddlewareHandler>[0]) => {
+  const requestId = c.get('requestId');
+  if (e instanceof ApiError) {
+    logger.warn({ err: e.message, code: e.code, requestId }, 'api error');
+    return c.json({ error: e.code, detail: e.message, request_id: requestId }, e.status as any);
+  }
+  logger.error({ err: String(e), requestId }, 'unhandled error');
+  return c.json({ error: 'INTERNAL', detail: 'Internal server error', request_id: requestId }, 500);
+};
+
 export const cors: MiddlewareHandler = async (c, next) => {
   c.header('Access-Control-Allow-Origin', '*');
   c.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
