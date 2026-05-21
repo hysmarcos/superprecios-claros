@@ -1,0 +1,526 @@
+{
+  "id": "471e6477-2268-43f5-8fc2-fbcb73c6b18c",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.cadenas": {
+      "name": "cadenas",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "comercio_id": {
+          "name": "comercio_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bandera_id": {
+          "name": "bandera_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nombre_display": {
+          "name": "nombre_display",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "grupo": {
+          "name": "grupo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "razon_social": {
+          "name": "razon_social",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cuit": {
+          "name": "cuit",
+          "type": "varchar(15)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "url_sitio": {
+          "name": "url_sitio",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "url_logo": {
+          "name": "url_logo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "activa": {
+          "name": "activa",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "cadenas_comercio_bandera_uniq": {
+          "name": "cadenas_comercio_bandera_uniq",
+          "nullsNotDistinct": false,
+          "columns": [
+            "comercio_id",
+            "bandera_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.job_runs": {
+      "name": "job_runs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "job_name": {
+          "name": "job_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "finished_at": {
+          "name": "finished_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rows_processed": {
+          "name": "rows_processed",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "skus_new": {
+          "name": "skus_new",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "skus_updated": {
+          "name": "skus_updated",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error_message": {
+          "name": "error_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_job_runs_recent": {
+          "name": "idx_job_runs_recent",
+          "columns": [
+            {
+              "expression": "started_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.precios_actuales": {
+      "name": "precios_actuales",
+      "schema": "",
+      "columns": {
+        "ean": {
+          "name": "ean",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cadena_id": {
+          "name": "cadena_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "region": {
+          "name": "region",
+          "type": "varchar(15)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fecha": {
+          "name": "fecha",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "precio_lista": {
+          "name": "precio_lista",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "precio_efectivo": {
+          "name": "precio_efectivo",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "promo_leyenda": {
+          "name": "promo_leyenda",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "promo_vigencia_fin": {
+          "name": "promo_vigencia_fin",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sucursales_count": {
+          "name": "sucursales_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "min_90d": {
+          "name": "min_90d",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "min_90d_fecha": {
+          "name": "min_90d_fecha",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "delta_7d_pct": {
+          "name": "delta_7d_pct",
+          "type": "numeric(6, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_min_historico": {
+          "name": "is_min_historico",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "precios_actuales_ean_productos_ean_fk": {
+          "name": "precios_actuales_ean_productos_ean_fk",
+          "tableFrom": "precios_actuales",
+          "tableTo": "productos",
+          "columnsFrom": [
+            "ean"
+          ],
+          "columnsTo": [
+            "ean"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "precios_actuales_cadena_id_cadenas_id_fk": {
+          "name": "precios_actuales_cadena_id_cadenas_id_fk",
+          "tableFrom": "precios_actuales",
+          "tableTo": "cadenas",
+          "columnsFrom": [
+            "cadena_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "precios_actuales_ean_cadena_id_region_pk": {
+          "name": "precios_actuales_ean_cadena_id_region_pk",
+          "columns": [
+            "ean",
+            "cadena_id",
+            "region"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "region_valid": {
+          "name": "region_valid",
+          "value": "\"precios_actuales\".\"region\" IN ('NACIONAL','AMBA','CENTRO','CUYO','NEA','NOA','PATAGONIA')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.productos": {
+      "name": "productos",
+      "schema": "",
+      "columns": {
+        "ean": {
+          "name": "ean",
+          "type": "varchar(20)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "marca": {
+          "name": "marca",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cantidad_presentacion": {
+          "name": "cantidad_presentacion",
+          "type": "numeric(10, 3)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unidad_medida": {
+          "name": "unidad_medida",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "first_seen": {
+          "name": "first_seen",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_seen": {
+          "name": "last_seen",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "idx_productos_nombre_fts": {
+          "name": "idx_productos_nombre_fts",
+          "columns": [
+            {
+              "expression": "to_tsvector('spanish', \"nombre\" || ' ' || COALESCE(\"marca\",''))",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.snapshots": {
+      "name": "snapshots",
+      "schema": "",
+      "columns": {
+        "ean": {
+          "name": "ean",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cadena_id": {
+          "name": "cadena_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "region": {
+          "name": "region",
+          "type": "varchar(15)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fecha": {
+          "name": "fecha",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tier": {
+          "name": "tier",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "precio_lista": {
+          "name": "precio_lista",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "precio_efectivo": {
+          "name": "precio_efectivo",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "promo_leyenda": {
+          "name": "promo_leyenda",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_snapshots_lookup": {
+          "name": "idx_snapshots_lookup",
+          "columns": [
+            {
+              "expression": "ean",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "region",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "fecha",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "snapshots_ean_productos_ean_fk": {
+          "name": "snapshots_ean_productos_ean_fk",
+          "tableFrom": "snapshots",
+          "tableTo": "productos",
+          "columnsFrom": [
+            "ean"
+          ],
+          "columnsTo": [
+            "ean"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "snapshots_cadena_id_cadenas_id_fk": {
+          "name": "snapshots_cadena_id_cadenas_id_fk",
+          "tableFrom": "snapshots",
+          "tableTo": "cadenas",
+          "columnsFrom": [
+            "cadena_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "snapshots_ean_cadena_id_region_fecha_pk": {
+          "name": "snapshots_ean_cadena_id_region_fecha_pk",
+          "columns": [
+            "ean",
+            "cadena_id",
+            "region",
+            "fecha"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "tier_valid": {
+          "name": "tier_valid",
+          "value": "\"snapshots\".\"tier\" IN ('daily','weekly')"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
