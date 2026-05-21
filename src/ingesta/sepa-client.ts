@@ -36,7 +36,16 @@ export async function downloadDailySepaZip(now: Date = new Date()): Promise<Sepa
   const dest = join(env.INGESTA_TMP_DIR, filename);
 
   logger.info({ url, dest }, 'downloading SEPA ZIP');
-  const res = await fetch(url);
+  // El backend de datos.produccion.gob.ar está detrás de CloudFront y filtra
+  // requests sin User-Agent de browser (Node sin headers da 403 desde IPs no-AR).
+  // Mandamos UA realista + Accept para pasar.
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+      'Accept': 'application/zip, application/octet-stream, */*',
+      'Accept-Language': 'es-AR,es;q=0.9,en;q=0.8',
+    },
+  });
   if (!res.ok) throw new Error(`SEPA download failed: ${res.status} ${res.statusText}`);
   if (!res.body) throw new Error('SEPA response has no body');
 
