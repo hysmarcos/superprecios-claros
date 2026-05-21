@@ -1,10 +1,13 @@
 import { serve } from '@hono/node-server';
 import { createApp } from './api/server.js';
+import { registerHealth } from './api/routes/health.js';
+import { registerManifest } from './api/routes/manifest.js';
 import { env } from './lib/env.js';
 import { logger } from './lib/logger.js';
 
 const app = createApp();
-app.get('/', (c) => c.text('superprecios-claros API'));
+registerHealth(app);
+registerManifest(app);
 
 serve({ fetch: app.fetch, port: env.PORT }, ({ port }) => {
   logger.info({ port }, 'API listening');
