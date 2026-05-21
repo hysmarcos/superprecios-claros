@@ -1,0 +1,1 @@
+ALTER TABLE "productos" ALTER COLUMN "unidad_medida" SET DATA TYPE varchar(20);
