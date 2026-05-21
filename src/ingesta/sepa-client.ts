@@ -56,10 +56,11 @@ export async function downloadDailySepaZip(now: Date = new Date()): Promise<Sepa
     },
   });
   if (!res.ok) {
-    // Capturar primeros bytes de body para diagnosticar (CloudFront muestra error en HTML)
+    // Capturar primeros bytes de body para diagnosticar
     let bodySnippet = '';
-    try { bodySnippet = (await res.text()).slice(0, 500); } catch {}
-    logger.error({ status: res.status, statusText: res.statusText, bodySnippet, responseHeaders: Object.fromEntries(res.headers) }, 'SEPA fetch error response');
+    try { bodySnippet = (await res.text()).slice(0, 300); } catch {}
+    const headersFlat = Array.from(res.headers.entries()).map(([k, v]) => `${k}=${v}`).join('; ');
+    logger.error(`SEPA fetch error: status=${res.status} statusText=${res.statusText} url=${url} headers={${headersFlat}} body="${bodySnippet.replace(/\n/g, '\\n')}"`);
     throw new Error(`SEPA download failed: ${res.status} ${res.statusText}`);
   }
   if (!res.body) throw new Error('SEPA response has no body');
