@@ -1,0 +1,6 @@
+name = "superprecios-sepa-proxy"
+main = "src/worker.ts"
+compatibility_date = "2026-05-21"
+
+[observability]
+enabled = true
