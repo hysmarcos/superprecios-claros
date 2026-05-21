@@ -1,9 +1,39 @@
+# Dependencies & build
 node_modules/
 dist/
+coverage/
+
+# Logs
 *.log
+
+# Env / secrets
 .env
 .env.local
-coverage/
+.env.*.local
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Local temp
 /tmp/
+
+# IDE / editor
 .vscode/
+.idea/
+*.swp
+*.swo
+
+# AI tooling — internal workflow, no para el repo público
+.claude/
+.cursor/
+.aider*
+.windsurfrules
+.continue/
+CLAUDE.md
+GEMINI.md
+AGENTS.md
+
+# Plans / specs internos del proceso de desarrollo (no son docs del repo)
+docs/superpowers/
+.specstory/
