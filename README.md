@@ -7,28 +7,28 @@ API pública con histórico de precios de supermercados argentinos. Ingiere diar
 - **Histórico**: últimos 7 días con resolución diaria + 1 snapshot semanal hacia atrás indefinidamente.
 - **Regiones**: NACIONAL, AMBA, CENTRO, CUYO, NEA, NOA, PATAGONIA.
 
-> **Estado**: producción. El job de ingesta corre diariamente y la API es estable.
+> **Estado**: API pausada. La versión pública en Railway está dada de baja y su URL ya no responde. El código sigue completo: la API y la ingesta se pueden correr en local con Docker (ver [Setup en local](#setup-en-local)).
 
 ---
 
 ## Para consumidores del API
 
-Base URL: `https://superprecios-claros.up.railway.app` *(o el subdominio asignado por Railway)*
+Base URL: `http://localhost:3000` cuando la corrés en local. *(La URL pública de Railway está pausada.)*
 
 ### Quick start
 
 ```bash
 # 1. Leer el manifest (cachear ~1h, contiene version_tag para cache busting)
-curl https://superprecios-claros.up.railway.app/v1/manifest
+curl http://localhost:3000/v1/manifest
 
 # 2. Info completa de un SKU con histórico
-curl "https://superprecios-claros.up.railway.app/v1/sku/7790139101169?region=NACIONAL&v=20260520"
+curl "http://localhost:3000/v1/sku/7790139101169?region=NACIONAL&v=20260520"
 
 # 3. Batch de hasta 50 EANs (sin histórico, para listados)
-curl "https://superprecios-claros.up.railway.app/v1/skus?eans=7790139101169,7793360129957&region=NACIONAL&v=20260520"
+curl "http://localhost:3000/v1/skus?eans=7790139101169,7793360129957&region=NACIONAL&v=20260520"
 
 # 4. Comparar canasta entre cadenas
-curl -X POST https://superprecios-claros.up.railway.app/v1/basket \
+curl -X POST http://localhost:3000/v1/basket \
   -H "content-type: application/json" \
   -d '{"eans":["7790139101169","7793360129957"],"region":"NACIONAL"}'
 ```
@@ -212,7 +212,7 @@ El test E2E (`tests/ingesta-e2e.test.ts`) corre el pipeline contra un fixture ch
                                │ 1 GET/día
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  Cron service "ingesta" (Railway, 09:00 ART)                │
+│  Cron service "ingesta" (09:00 ART)                         │
 │  download → unzip → CSV stream → normalize → upsert         │
 │           → delta snapshots → retención → métricas           │
 └──────────────────────────────┬──────────────────────────────┘
