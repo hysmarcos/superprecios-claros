@@ -2,21 +2,10 @@ import { sql } from 'drizzle-orm';
 import { db, pool } from '../db/client.js';
 import { preciosActuales, productos } from '../db/schema.js';
 import type { Region } from '../db/schema.js';
-import type { NormalizedPrice } from './median.js';
+import type { PriceRow } from './aggregate.js';
 import { logger } from '../lib/logger.js';
 
-export interface UpsertRow {
-  ean: string;
-  cadenaId: number;
-  region: Region;
-  fecha: Date;
-  price: NormalizedPrice;
-  // catálogo
-  nombre: string;
-  marca: string | null;
-  cantidadPresentacion: number | null;
-  unidadMedida: string | null;
-}
+export type UpsertRow = PriceRow;
 
 const BATCH = 1000;
 

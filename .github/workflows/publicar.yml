@@ -1,0 +1,86 @@
+name: Publicar API estática
+
+# Una vez por día: baja el ZIP de SEPA, arma los JSON y los publica en GitHub Pages.
+# SEPA sube el archivo del día cerca de las 13:15 ART; corremos a las 17:30 ART.
+on:
+  schedule:
+    - cron: '30 20 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # guardar el histórico como asset del release "estado"
+  pages: write
+  id-token: write
+  actions: write    # mantener activo el cron (ver último paso)
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      TZ: America/Argentina/Buenos_Aires   # el día de la semana elige qué ZIP bajar
+      NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=12288
+      INGESTA_TMP_DIR: ${{ runner.temp }}/sepa
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+      - name: Bajar el histórico de la corrida anterior
+        run: |
+          mkdir -p state
+          if gh release view estado >/dev/null 2>&1; then
+            gh release download estado --dir state --clobber
+          else
+            echo "No hay release 'estado': el histórico arranca vacío."
+          fi
+
+      - name: Armar la API estática
+        run: node dist/static-entrypoint.js --out site --state state --base-url "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+
+      - name: Guardar el histórico
+        run: |
+          if ! gh release view estado >/dev/null 2>&1; then
+            gh release create estado --title "Estado del histórico (automático)" --latest=false \
+              --notes "Lo escribe el workflow publicar.yml todos los días. No es una versión del código."
+          fi
+          gh release upload estado state/historico.ndjson.gz state/estado.json --clobber
+
+      - name: Medir el sitio
+        run: |
+          du -sh site
+          find site -type f | wc -l
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
+
+  keepalive:
+    # GitHub apaga los cron de repos públicos sin actividad por 60 días.
+    # Volver a habilitar el workflow por API reinicia ese plazo.
+    needs: deploy
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/publicar.yml/enable"

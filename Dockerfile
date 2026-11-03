@@ -15,6 +15,8 @@ RUN npm run build
 
 FROM node:22-slim AS run
 WORKDIR /app
+# La ingesta usa `unzip` del sistema para los ZIP de SEPA
+RUN apt-get update && apt-get install -y --no-install-recommends unzip && rm -rf /var/lib/apt/lists/*
 # Producción + dev deps (drizzle-kit corre en migrate pre-deploy)
 COPY package*.json ./
 RUN npm ci

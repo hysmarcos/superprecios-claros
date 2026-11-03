@@ -1,40 +1,34 @@
-import { createReadStream, createWriteStream, mkdirSync, existsSync } from 'node:fs';
-import { pipeline } from 'node:stream/promises';
-import { join, basename } from 'node:path';
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { readdir } from 'node:fs/promises';
-import yauzl from 'yauzl';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { logger } from '../lib/logger.js';
 
-function extractZip(zipPath: string, destDir: string): Promise<string[]> {
-  return new Promise((resolve, reject) => {
-    if (!existsSync(destDir)) mkdirSync(destDir, { recursive: true });
-    const extracted: string[] = [];
-    yauzl.open(zipPath, { lazyEntries: true }, (err, zip) => {
-      if (err) return reject(err);
-      zip.readEntry();
-      zip.on('entry', (entry) => {
-        if (/\/$/.test(entry.fileName)) {
-          zip.readEntry();
-          return;
-        }
-        const outPath = join(destDir, basename(entry.fileName));
-        zip.openReadStream(entry, (err2, readStream) => {
-          if (err2) return reject(err2);
-          pipeline(readStream, createWriteStream(outPath))
-            .then(() => { extracted.push(outPath); zip.readEntry(); })
-            .catch(reject);
-        });
-      });
-      zip.on('end', () => resolve(extracted));
-      zip.on('error', reject);
-    });
-  });
+const execFileAsync = promisify(execFile);
+
+/**
+ * Extrae un ZIP aplanando carpetas (`unzip -j`). Usa el `unzip` del sistema y no
+ * yauzl: con los ZIP de SEPA (entradas grandes sin compresión), el stream de yauzl
+ * se frenaba (visto con Node 24 en Windows) y el proceso terminaba con código 0,
+ * sin error y con archivos a medias. `unzip` viene en los runners de GitHub.
+ */
+async function extractZip(zipPath: string, destDir: string): Promise<void> {
+  mkdirSync(destDir, { recursive: true });
+  try {
+    await execFileAsync('unzip', ['-o', '-j', '-q', zipPath, '-d', destDir], { maxBuffer: 16 * 1024 * 1024 });
+  } catch (e) {
+    // Código 1 = terminó bien pero con avisos (por ejemplo, rutas con "\\")
+    if ((e as { code?: number }).code !== 1) throw e;
+    logger.debug({ zipPath, stderr: String((e as { stderr?: string }).stderr ?? '') }, 'unzip con avisos');
+  }
 }
 
 export interface InnerChainBundle {
   comercioId: number;
   banderaPrefix: number;  // sepa_1_... o sepa_2_...
   csvDir: string;          // ruta donde están comercio.csv, sucursales.csv, productos.csv
+  fechaArchivo: string | null;  // YYYY-MM-DD tomado del nombre del inner ZIP
 }
 
 /**
@@ -54,11 +48,12 @@ export async function decompressDailyZip(zipPath: string, workDir: string): Prom
     if (!match) { logger.warn({ innerName }, 'inner zip name no match'); continue; }
     const banderaPrefix = Number(match[1]);
     const comercioId = Number(match[2]);
+    const fechaArchivo = /_(\d{4}-\d{2}-\d{2})_/.exec(innerName)?.[1] ?? null;
     const innerPath = join(outerDir, innerName);
     const innerDir = join(workDir, `chain-${comercioId}`);
     try {
       await extractZip(innerPath, innerDir);
-      bundles.push({ comercioId, banderaPrefix, csvDir: innerDir });
+      bundles.push({ comercioId, banderaPrefix, csvDir: innerDir, fechaArchivo });
     } catch (e) {
       logger.warn({ innerName, err: String(e) }, 'inner zip extraction failed, skipping');
     }
