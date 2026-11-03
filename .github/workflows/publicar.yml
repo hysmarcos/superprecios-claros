@@ -52,7 +52,7 @@ jobs:
       - name: Guardar el histórico
         run: |
           if ! gh release view estado >/dev/null 2>&1; then
-            gh release create estado --title "Estado del histórico (automático)" --latest=false \
+            gh release create estado --title "Estado del histórico (automático)" --prerelease --latest=false \
               --notes "Lo escribe el workflow publicar.yml todos los días. No es una versión del código."
           fi
           gh release upload estado state/historico.ndjson.gz state/estado.json --clobber
