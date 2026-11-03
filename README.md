@@ -1,57 +1,50 @@
 # superprecios-claros
 
-API pública con histórico de precios de supermercados argentinos. Ingiere diariamente los datos oficiales de **[SEPA](https://datos.produccion.gob.ar/dataset/sepa-precios)** (Sistema Electrónico de Publicidad de Precios Argentinos), los normaliza por SKU × cadena × región, y los expone vía HTTP a extensiones de navegador, bots y dashboards que comparen precios entre cadenas.
+API pública con histórico de precios de supermercados argentinos. Toma los datos oficiales de **[SEPA](https://datos.produccion.gob.ar/dataset/sepa-precios)** (Sistema Electrónico de Publicidad de Precios Argentinos), los normaliza por SKU × cadena × región y los publica como archivos JSON para extensiones de navegador, bots y dashboards que comparan precios entre cadenas.
 
-- **Sin auth, sin rate-limits artificiales.** Datos públicos del gobierno (CC-BY) re-servidos a todo el que quiera enchufarse.
-- **Cobertura**: Coto, Carrefour (Hiper / Market / Express / Maxi), Cencosud (Jumbo / Disco / Vea), DIA, La Anónima / Topsy / Bomba, Cooperativa Obrera, Libertad, Toledo, y más (~15 cadenas).
-- **Histórico**: últimos 7 días con resolución diaria + 1 snapshot semanal hacia atrás indefinidamente.
+- **Sin auth, sin servidor, costo $0.** Un workflow de GitHub Actions arma los JSON una vez por día y GitHub Pages los sirve.
+- **Cobertura**: Coto, Carrefour (Hiper / Market / Express / Maxi), Cencosud (Jumbo / Disco / Vea), DIA, La Anónima / Topsy / Bomba, Cooperativa Obrera, Libertad, Toledo (15 cadenas configuradas; el manifest dice cuáles trajo SEPA hoy).
+- **Histórico**: últimos 7 días con resolución diaria + 1 punto por semana (lunes) hacia atrás.
 - **Regiones**: NACIONAL, AMBA, CENTRO, CUYO, NEA, NOA, PATAGONIA.
 
-> **Estado**: API pausada. La versión pública en Railway está dada de baja y su URL ya no responde. El código sigue completo: la API y la ingesta se pueden correr en local con Docker (ver [Setup en local](#setup-en-local)).
+> **Estado**: en línea en **https://hysmarcos.github.io/superprecios-claros/**, como API estática. Se actualiza todos los días a las 17:30 (hora argentina). El histórico empezó de cero el 2026-11-02: el de la época de Railway no se guardó.
 
 ---
 
 ## Para consumidores del API
 
-Base URL: `http://localhost:3000` cuando la corrés en local. *(La URL pública de Railway está pausada.)*
+Base URL: `https://hysmarcos.github.io/superprecios-claros`
+
+Son archivos estáticos: cada "endpoint" es una URL fija que termina en `.json`. No hay query params.
 
 ### Quick start
 
 ```bash
-# 1. Leer el manifest (cachear ~1h, contiene version_tag para cache busting)
-curl http://localhost:3000/v1/manifest
+# 1. Manifest: fecha de los datos, version_tag, cadenas y regiones
+curl https://hysmarcos.github.io/superprecios-claros/v1/manifest.json
 
-# 2. Info completa de un SKU con histórico
-curl "http://localhost:3000/v1/sku/7790139101169?region=NACIONAL&v=20260520"
+# 2. Un SKU con precios por cadena e histórico
+curl https://hysmarcos.github.io/superprecios-claros/v1/sku/7790139101169/NACIONAL.json
 
-# 3. Batch de hasta 50 EANs (sin histórico, para listados)
-curl "http://localhost:3000/v1/skus?eans=7790139101169,7793360129957&region=NACIONAL&v=20260520"
-
-# 4. Comparar canasta entre cadenas
-curl -X POST http://localhost:3000/v1/basket \
-  -H "content-type: application/json" \
-  -d '{"eans":["7790139101169","7793360129957"],"region":"NACIONAL"}'
+# 3. Listado liviano: todos los EAN que terminan en "69", sin histórico
+curl https://hysmarcos.github.io/superprecios-claros/v1/skus/NACIONAL/69.json
 ```
 
 ### Endpoints
 
-| Método | Path | Descripción |
+| Path | Equivale a (API con servidor) | Descripción |
 |---|---|---|
-| GET | `/v1/manifest` | Metadata: `version_tag`, cadenas activas con SKU counts, regiones |
-| GET | `/v1/sku/:ean?region=…&v=…` | SKU completo: precios por cadena + histórico delta-only |
-| GET | `/v1/skus?eans=…&region=…&v=…` | Batch slim (≤50 EANs), sin histórico, ideal para grids |
-| POST | `/v1/basket` | Comparador de canasta: total por cadena + cadena más barata |
-| GET | `/v1/health` | Healthcheck con estado de DB |
+| `/v1/manifest.json` | `GET /v1/manifest` | `version_tag`, fecha de los datos, cadenas con cantidad de SKUs, regiones |
+| `/v1/sku/{ean}/{region}.json` | `GET /v1/sku/:ean?region=` | SKU completo: precios por cadena + histórico delta-only |
+| `/v1/skus/{region}/{shard}.json` | `GET /v1/skus?eans=` | Listado slim de los EAN que terminan en `{shard}` (2 dígitos, `00`–`99`) |
+| `/v1/health.json` | `GET /v1/health` | Fecha de la última actualización |
+| — | `POST /v1/basket` | No existe en la versión estática: se calcula en el cliente (ver abajo) |
 
-### Cache busting
+`{region}` va en mayúsculas: `NACIONAL`, `AMBA`, `CENTRO`, `CUYO`, `NEA`, `NOA` o `PATAGONIA`.
 
-Las URLs de datos (`/v1/sku/:ean`, `/v1/skus`) llevan `?v=<version_tag>` con `Cache-Control: immutable`. El flujo correcto en el cliente:
+### Formato — `/v1/sku/{ean}/{region}.json`
 
-1. Al iniciar, hacer `GET /v1/manifest`, leer `version_tag` (formato `YYYYMMDD`), guardarlo localmente.
-2. Usar ese `version_tag` en todas las consultas hasta el próximo `manifest`.
-3. Re-fetchear el manifest cada ~1 hora. Cuando cambia, todas las URLs son nuevas → cache miss controlado, datos frescos.
-
-### Formato de respuesta — `GET /v1/sku/:ean`
+Valores ilustrativos (para ver uno real, abrí la URL del Quick start):
 
 ```json
 {
@@ -63,7 +56,7 @@ Las URLs de datos (`/v1/sku/:ean`, `/v1/skus`) llevan `?v=<version_tag>` con `Ca
     "unidad": "ml"
   },
   "region": "NACIONAL",
-  "fecha": "2026-05-20",
+  "fecha": "2026-11-02",
   "precios": [
     {
       "cadena": { "id": 1, "nombre": "Coto", "grupo": "Coto", "logo_url": null },
@@ -71,33 +64,32 @@ Las URLs de datos (`/v1/sku/:ean`, `/v1/skus`) llevan `?v=<version_tag>` con `Ca
       "precio_efectivo": 1873,
       "promo": null,
       "min_90d": 1650,
-      "min_90d_fecha": "2026-04-15",
+      "min_90d_fecha": "2026-10-15",
       "delta_7d_pct": 2.3,
       "is_min_historico": false
     }
   ],
   "historico": {
     "1": [
-      { "fecha": "2026-04-15", "precio_lista": 1650, "precio_efectivo": 1650 },
-      { "fecha": "2026-05-13", "precio_lista": 1820, "precio_efectivo": 1690, "promo": "DEL 11/05 AL 17/05" }
+      { "fecha": "2026-10-15", "precio_lista": 1650, "precio_efectivo": 1650, "promo": null },
+      { "fecha": "2026-10-28", "precio_lista": 1820, "precio_efectivo": 1690, "promo": "DEL 27/10/2026 AL 02/11/2026" }
     ]
   }
 }
 ```
 
-El histórico es **delta-only**: solo aparecen los días donde el precio cambió. Para dibujar un gráfico continuo, el cliente hace forward-fill (step chart) entre puntos.
+`precios` viene ordenado del más barato al más caro. El histórico es **delta-only**: solo aparecen los días donde el precio efectivo cambió. Para dibujar un gráfico continuo, el cliente hace forward-fill (step chart) entre puntos.
 
-### Formato — `GET /v1/skus?eans=...`
+### Formato — `/v1/skus/{region}/{shard}.json`
 
-Versión slim sin histórico, pensada para listados con muchos productos:
+Versión slim sin histórico, para listados con muchos productos. `items` es un objeto con el EAN como clave (valores ilustrativos):
 
 ```json
 {
   "region": "NACIONAL",
-  "fecha": "2026-05-20",
-  "items": [
-    {
-      "ean": "7790139101169",
+  "fecha": "2026-11-02",
+  "items": {
+    "7790139101169": {
       "producto": { "nombre": "VINAGRE DE VINO FAVINCO 500ML", "marca": "FAVINCO" },
       "por_cadena": {
         "1": { "precio_efectivo": 1873, "delta_7d_pct": 2.3, "is_min_historico": false, "tiene_promo": false },
@@ -105,28 +97,54 @@ Versión slim sin histórico, pensada para listados con muchos productos:
       },
       "cadena_min": { "id": 2, "precio": 1720 }
     }
-  ],
-  "missing": ["7790000000099"]
+  }
 }
 ```
 
-`cadena_min` viene pre-calculado para que el cliente arme directo un chip "X% más barato en Y" sin recorrer todas las cadenas.
+Para buscar varios EAN: agrupalos por sus últimos 2 dígitos y bajá un archivo por grupo. Un EAN que no está en `items` no tiene precio hoy en esa región.
+
+### Canasta (`/v1/basket`) en el cliente
+
+Una página estática no puede recibir un `POST`. La canasta se calcula con los listados:
+
+```js
+const BASE = 'https://hysmarcos.github.io/superprecios-claros';
+
+async function canasta(eans, region = 'NACIONAL') {
+  const shards = [...new Set(eans.map((e) => e.slice(-2)))];
+  const archivos = await Promise.all(
+    shards.map((s) => fetch(`${BASE}/v1/skus/${region}/${s}.json`).then((r) => r.json())),
+  );
+  const items = Object.assign({}, ...archivos.map((a) => a.items));
+  const totales = {};
+  for (const ean of eans) {
+    for (const [cadena, p] of Object.entries(items[ean]?.por_cadena ?? {})) {
+      totales[cadena] ??= { cadena_id: Number(cadena), total: 0, skus_disponibles: 0 };
+      totales[cadena].total += p.precio_efectivo;
+      totales[cadena].skus_disponibles++;
+    }
+  }
+  // Solo comparan bien las cadenas que tienen todos los productos
+  return Object.values(totales)
+    .map((t) => ({ ...t, skus_faltantes: eans.length - t.skus_disponibles }))
+    .sort((a, b) => a.skus_faltantes - b.skus_faltantes || a.total - b.total);
+}
+```
+
+Los nombres de las cadenas están en `manifest.json` → `cadenas`.
+
+### Cache y version_tag
+
+GitHub Pages manda `Cache-Control: max-age=600` en todos los archivos (10 minutos) y no deja cambiarlo. También manda `Access-Control-Allow-Origin: *`, así que se puede leer desde cualquier página o extensión. Los datos cambian una vez por día, así que alcanza. Si querés forzar datos nuevos, leé `version_tag` del manifest y agregalo como `?v=<version_tag>` a las URLs: Pages ignora el parámetro, pero el cache del navegador o de tu CDN lo toma como otra URL.
 
 ### Errores
 
-Status uniformes con body JSON:
+| Status | Significado |
+|---|---|
+| 404 | El EAN no tiene precio hoy en esa región, o la ruta no existe. El cuerpo es HTML, no JSON: mirá el status. |
+| 200 | Todo bien. |
 
-```json
-{ "error": "SKU_NOT_FOUND", "detail": "EAN 7790000000099 no encontrado", "request_id": "abc-123" }
-```
-
-| Código | Status | Significado |
-|---|---|---|
-| `SKU_NOT_FOUND` | 404 | El EAN no está en la base |
-| `INVALID_INPUT` | 400 | Validación falló (EAN mal formado, región inválida, batch >50, etc.) |
-| `INTERNAL` | 500 | Bug nuestro — incluye `request_id` para reportar |
-
-Cada response incluye un header `X-Request-Id` (UUID) que loguea el server para troubleshooting.
+No hay errores de validación: si el EAN está mal formado, la respuesta es 404.
 
 ### Cobertura por cadena
 
@@ -141,11 +159,11 @@ Cada response incluye un header `X-Request-Id` (UUID) que loguea el server para 
 | Hipermercado Libertad | Libertad | 14 |
 | Toledo | — | 15 |
 
-El listado vivo está siempre en `GET /v1/manifest`. Cualquier cadena obligada por la Ley de Góndolas que aparezca en SEPA se incorpora automáticamente al pipeline.
+El listado vivo está en `manifest.json`. Una cadena con `skus_count: 0` no vino en el archivo de SEPA de ese día. Para sumar una cadena nueva hay que agregarla al final de `src/db/cadenas.ts`.
 
 ### Licencia de datos
 
-Los precios provienen de [SEPA](https://datos.produccion.gob.ar/dataset/sepa-precios), publicados por el Ministerio de Economía bajo licencia **CC-BY**. Esta API los re-sirve sin transformaciones sustanciales — solo agregaciones estadísticas (mediana por región/sucursal, delta, mínimo histórico). Si construís algo encima, citá la fuente.
+Los precios provienen de [SEPA](https://datos.produccion.gob.ar/dataset/sepa-precios), publicados por el Ministerio de Economía bajo licencia **CC-BY**. Esta API los re-sirve sin transformaciones sustanciales: solo agregaciones estadísticas (mediana por región, delta, mínimo de 90 días). Si construís algo encima, citá la fuente.
 
 ---
 
@@ -159,13 +177,34 @@ Los precios provienen de [SEPA](https://datos.produccion.gob.ar/dataset/sepa-pre
 - **pg** (`node-postgres`) — driver Postgres
 - **Pino** — logging estructurado
 - **Zod** — validación de input
-- **yauzl** — descompresión ZIP (los archivos SEPA pesan ~322 MB)
+- **`unzip`** del sistema — descompresión ZIP (los archivos SEPA pesan ~322 MB)
 - **Vitest** — tests
-- **Docker Compose** — Postgres local
+- **Docker Compose** — Postgres local (solo para el modo servidor)
+- **GitHub Actions + GitHub Pages** — build diario y hosting de la API estática
 
-### Setup en local
+### Armar la API estática en local
 
-Prerrequisitos: Node 22, Docker, git.
+Prerrequisitos: Node 22, `unzip`, git. No hace falta Postgres.
+
+```bash
+git clone https://github.com/hysmarcos/superprecios-claros.git
+cd superprecios-claros
+npm install
+npm run build
+
+# Baja el ZIP del día (~322 MB) y escribe los JSON en ./site.
+# El histórico queda en ./state y se reutiliza en la corrida siguiente.
+NODE_OPTIONS=--max-old-space-size=12288 npm run build:static -- --out site --state state
+
+# Con un ZIP ya descargado:
+npm run build:static -- --zip sepa_lunes.zip --out site --state state
+```
+
+Es lo mismo que corre el workflow [`publicar.yml`](.github/workflows/publicar.yml) todos los días.
+
+### Modo servidor (Postgres + Hono, opcional)
+
+La API original con base de datos sigue en el repo. Sirve para desarrollo o para alojarla con un servidor propio. Prerrequisitos: Node 22, Docker, `unzip`, git.
 
 ```bash
 git clone https://github.com/hysmarcos/superprecios-claros.git
@@ -186,22 +225,25 @@ npm run dev:api
 # → http://localhost:3000/v1/health
 ```
 
-### Correr la ingesta diaria local (descarga ~322 MB)
+Ingesta a Postgres (descarga ~322 MB):
 
 ```bash
 npm run dev:ingesta
 ```
 
-Esto descarga el ZIP del día actual de SEPA, descomprime las ~21 cadenas, parsea cada `productos.csv`, normaliza y persiste. Tarda ~5-7 minutos. El resultado queda en `precios_actuales` (foto de hoy) + `snapshots` (deltas históricos).
+Descarga el ZIP del día de SEPA, descomprime las cadenas, parsea cada `productos.csv`, normaliza y guarda en `precios_actuales` (foto de hoy) + `snapshots` (deltas históricos).
 
 ### Tests
 
 ```bash
-npm test          # corre todo (~5s)
+npm test          # corre todo (~5s; los tests de API y el E2E necesitan Postgres)
 npm run test:watch
+
+# Solo los que no usan base de datos
+npx vitest run tests/static-historico.test.ts tests/static-site.test.ts tests/median.test.ts tests/parser.test.ts
 ```
 
-El test E2E (`tests/ingesta-e2e.test.ts`) corre el pipeline contra un fixture chico (Coto, ~2000 filas / 300+ EANs) y verifica que la integración full descarga → parse → normalize → upsert → métricas funciona.
+`tests/static-site.test.ts` arma la API estática con el fixture y revisa el manifest, un SKU y un listado. El test E2E (`tests/ingesta-e2e.test.ts`) corre el pipeline contra un fixture chico (Coto, ~2000 filas / 300+ EANs) y verifica que la integración full descarga → parse → normalize → upsert → métricas funciona.
 
 ### Arquitectura
 
@@ -212,29 +254,40 @@ El test E2E (`tests/ingesta-e2e.test.ts`) corre el pipeline contra un fixture ch
                                │ 1 GET/día
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  Cron service "ingesta" (09:00 ART)                         │
-│  download → unzip → CSV stream → normalize → upsert         │
-│           → delta snapshots → retención → métricas           │
-└──────────────────────────────┬──────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Postgres                                                   │
-│  productos · cadenas · precios_actuales · snapshots · …     │
-└──────────────────────────────┬──────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Web service "api" (Hono, always-on)                        │
-│  /v1/manifest · /v1/sku/:ean · /v1/skus · /v1/basket        │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ DNS proxy
-                               ▼
-                  Cloudflare CDN (cache /sku, /skus)
-                               │
-                               ▼
-                  Consumidores (extensiones, bots, web)
+│  GitHub Actions · publicar.yml (cron 17:30 ART)             │
+│  download → unzip → CSV stream → mediana por región         │
+│           → histórico delta-only → retención → métricas      │
+│           → JSON: manifest · sku/{ean}/{region} · skus/…     │
+└───────────────┬─────────────────────────────┬───────────────┘
+                │ histórico (ndjson.gz)       │ artifact
+                ▼                             ▼
+┌───────────────────────────────┐ ┌───────────────────────────┐
+│  Release "estado"             │ │  GitHub Pages (CDN)       │
+│  se baja y se sube cada día   │ │  hysmarcos.github.io/…    │
+└───────────────────────────────┘ └─────────────┬─────────────┘
+                                                │
+                                                ▼
+                               Consumidores (extensiones, bots, web)
 ```
+
+Por qué así:
+
+- **Costo $0.** Actions es gratis en repos públicos y Pages también. No hay servidor ni base que pagar o mantener despierta.
+- **El histórico vive en un asset de release**, no en git: reemplazarlo cada día no hace crecer el repo.
+- **Pages no ejecuta código.** Por eso no hay `POST /v1/basket` ni filtros por query: la canasta se calcula en el cliente con los listados.
+
+Límites a vigilar (medidos con los datos del 2026-11-02):
+
+| Límite | Valor | Hoy |
+|---|---|---|
+| Tamaño del sitio en Pages | 1 GB | 358 MB en 286.031 archivos |
+| Ancho de banda de Pages | 100 GB/mes (límite blando) | — |
+| Deploy en Pages | 10 min | — |
+| Cron en repos públicos | GitHub lo apaga tras 60 días sin actividad | el workflow lo vuelve a habilitar en cada corrida |
+
+El sitio crece con el histórico. Si un día pasa de 900 MB, el build publica menos semanas de histórico (52 → 39 → 26 → 13 → 4) hasta que entre. El estado en el release guarda todo igual.
+
+El modo servidor (Postgres + Hono) usa el mismo código de parseo y normalización (`src/ingesta/aggregate.ts`). Solo cambia dónde se guarda el resultado.
 
 ### Estructura del repo
 
@@ -254,6 +307,7 @@ src/
 │   ├── index.ts              # Orquestador end-to-end
 │   ├── sepa-client.ts        # Descarga del ZIP del día (7 resource IDs)
 │   ├── decompress.ts         # ZIP outer → ZIPs inner por cadena → CSVs
+│   ├── aggregate.ts          # CSV → un precio por EAN × cadena × región (sin DB)
 │   ├── parser.ts             # Streaming CSV parser (productos + sucursales)
 │   ├── ean-adapter.ts        # Extracción EAN con quirks por cadena (Coto)
 │   ├── region-mapper.ts      # Provincia AR-X → región (AMBA, NOA, etc.)
@@ -262,8 +316,12 @@ src/
 │   ├── upsert.ts             # Batch UPSERT a productos + precios_actuales
 │   ├── snapshots.ts          # Delta-only INSERT + retención daily/weekly
 │   └── metrics.ts            # min_90d, delta_7d_pct, is_min_historico
+├── static/                   # API estática (GitHub Pages)
+│   ├── historico.ts          # Histórico delta-only, retención y métricas sin DB
+│   └── site.ts               # Escribe manifest, sku/, skus/, index.html
 ├── db/
 │   ├── schema.ts             # Drizzle schema completo
+│   ├── cadenas.ts            # Catálogo de cadenas (orden = cadena_id)
 │   ├── client.ts             # pg pool + drizzle handle
 │   └── seed.ts               # Seed inicial de cadenas
 ├── lib/
@@ -271,12 +329,16 @@ src/
 │   ├── logger.ts             # Pino
 │   └── errors.ts             # ApiError + códigos
 ├── api-entrypoint.ts         # bin para el web service
-└── ingesta-entrypoint.ts     # bin para el cron service
+├── ingesta-entrypoint.ts     # bin para la ingesta a Postgres
+└── static-entrypoint.ts      # bin para el build estático
 
 migrations/                   # Migraciones Drizzle generadas
 tests/
 ├── fixtures/                 # ZIP chico de SEPA para E2E
-└── ingesta-e2e.test.ts       # Pipeline E2E
+├── static-*.test.ts          # Build estático (sin DB)
+└── ingesta-e2e.test.ts       # Pipeline E2E con Postgres
+.github/workflows/
+└── publicar.yml              # Build diario + deploy a Pages
 ```
 
 ### Decisiones de diseño
@@ -284,20 +346,21 @@ tests/
 - **Precio representativo = mediana, no promedio.** SEPA tiene errores de carga ocasionales ($0.30 o $13M en alguna sucursal); la mediana los ignora.
 - **Cada bandera es una cadena.** Jumbo, Disco y Vea son del mismo grupo (Cencosud) pero los precios difieren entre banderas — los tratamos como cadenas separadas con `cadena_id` único.
 - **Histórico delta-only.** Solo se inserta una fila en `snapshots` cuando el precio cambió respecto al último snapshot. Reduce escrituras ~80%. El cliente reconstruye la serie continua con forward-fill.
-- **Retención**: snapshots `daily` mayores a 7 días se promueven a `weekly` si caen en lunes; el resto se borran. Cubre últimos 7 días + 1 snapshot semanal hacia atrás indefinidamente.
-- **Métricas pre-computadas** en `precios_actuales` (`min_90d`, `delta_7d_pct`, `is_min_historico`) → la API responde con un `SELECT *` simple, sin agregaciones por request.
+- **Retención**: snapshots `daily` mayores a 7 días se promueven a `weekly` si caen en lunes; el resto se borran. Cubre últimos 7 días + 1 snapshot semanal hacia atrás indefinidamente. En la versión estática nunca se borra el último punto de una serie, para que el histórico siempre termine en el último precio conocido.
+- **La fecha de los datos sale del archivo, no del reloj.** SEPA pone la fecha en el nombre de cada ZIP de cadena. Si un día no actualiza, el build no presenta datos viejos como nuevos.
+- **Métricas pre-computadas** (`min_90d`, `delta_7d_pct`, `is_min_historico`): en Postgres viven en `precios_actuales`; en la versión estática se calculan al escribir cada JSON. Nadie agrega datos por request.
 - **EAN canónico.** Coto pone el EAN en `id_producto` y `"1"` en `productos_ean` — `ean-adapter.ts` resuelve el quirk. Otras cadenas usan el campo correcto.
 
 ### Variables de entorno
 
 | Variable | Default | Descripción |
 |---|---|---|
-| `DATABASE_URL` | — | Postgres connection string (requerida) |
+| `DATABASE_URL` | — | Postgres connection string. La usan la API y la ingesta a Postgres; el build estático no |
 | `PORT` | `3000` | Puerto del web service |
 | `NODE_ENV` | `development` | `development` activa pino-pretty |
 | `LOG_LEVEL` | `info` | `fatal`/`error`/`warn`/`info`/`debug`/`trace` |
 | `SEPA_BASE_URL` | URL oficial | Override para mirror/staging |
-| `INGESTA_TMP_DIR` | `/tmp/sepa` | Dónde extraer el ZIP durante la ingesta |
+| `INGESTA_TMP_DIR` | `/tmp/sepa` | Dónde bajar y extraer el ZIP |
 
 ### Convenciones
 
@@ -309,11 +372,11 @@ tests/
 ### Roadmap
 
 - [ ] Selector de región basado en geolocalización del cliente (el backend ya guarda las 6 regiones)
-- [ ] Snapshots crudos archivados en object storage (resiliencia ante caída de SEPA)
+- [ ] Índice de búsqueda por nombre para la versión estática (hoy hay que conocer el EAN)
 - [ ] Detector de "fake discount" (cadena que sube precio antes de "ofrecer descuento")
 - [ ] Notificaciones de bajada de precio sobre SKUs favoritos
 - [ ] Fallback a APIs públicas de VTEX si SEPA queda fuera de servicio
-- [ ] Endpoint `/v1/search` con full-text sobre nombre + marca (índice GIN ya existe)
+- [ ] Endpoint `/v1/search` con full-text sobre nombre + marca en modo servidor (índice GIN ya existe)
 
 ## Contribuir
 
