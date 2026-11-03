@@ -25,7 +25,6 @@ jobs:
       TZ: America/Argentina/Buenos_Aires   # el día de la semana elige qué ZIP bajar
       NODE_ENV: production
       NODE_OPTIONS: --max-old-space-size=12288
-      INGESTA_TMP_DIR: ${{ runner.temp }}/sepa
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
@@ -46,7 +45,9 @@ jobs:
           fi
 
       - name: Armar la API estática
-        run: node dist/static-entrypoint.js --out site --state state --base-url "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+        env:
+          INGESTA_TMP_DIR: ${{ runner.temp }}/sepa
+        run: node dist/static-entrypoint.js --out site --state state --base-url "https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}"
 
       - name: Guardar el histórico
         run: |
@@ -58,7 +59,7 @@ jobs:
 
       - name: Medir el sitio
         run: |
-          du -sh site
+          du -sh --apparent-size site
           find site -type f | wc -l
 
       - uses: actions/upload-pages-artifact@v5
